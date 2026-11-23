@@ -6,6 +6,7 @@
 // Ordre conseillé : opposite → nextHead → isFree → freeCells → spawnTarget → movePlayer.
 
 import {
+  BASE_LENGTH,
   TARGET_COUNT,
   type Direction,
   type GameState,
@@ -27,7 +28,16 @@ function todo(name: string, ..._args: unknown[]): never {
  * que tous les cas sont couverts. Pas besoin de `default`.
  */
 export function opposite(direction: Direction): Direction {
-  return todo('opposite', direction)
+  switch (direction) {
+    case 'up':
+      return 'down'
+    case 'down':
+      return 'up'
+    case 'left':
+      return 'right'
+    case 'right':
+      return 'left'
+  }
 }
 
 /**
@@ -36,7 +46,19 @@ export function opposite(direction: Direction): Direction {
  * Indice : renvoyer un NOUVEAU point, ne jamais modifier `head` (il est `readonly`).
  */
 export function nextHead(head: Point, direction: Direction): Point {
-  return todo('nextHead', head, direction)
+   switch (direction) {
+    case 'up':
+      return { x: head.x, y: head.y - 1 }
+
+    case 'down':
+      return { x: head.x, y: head.y + 1 }
+
+    case 'left':
+      return { x: head.x - 1, y: head.y }
+
+    case 'right':
+      return { x: head.x + 1, y: head.y }
+  }
 }
 
 export function samePoint(a: Point, b: Point): boolean {
@@ -54,7 +76,10 @@ export function inside(level: Level, p: Point): boolean {
  * Trois lignes suffisent.
  */
 export function isFree(state: GameState, p: Point): boolean {
-  return todo('isFree', state, p)
+  if (!inside(state.level, p)) return false
+  if (state.level.walls.some(wall => samePoint(wall, p))) return false
+  if (state.players.some(player => player.trail.some(point => samePoint(point, p)))) return false
+  return true
 }
 
 /**
@@ -63,7 +88,21 @@ export function isFree(state: GameState, p: Point): boolean {
  * deux fois, puis `flat()`), puis `filter` avec `isFree`, puis `filter` sur les cibles.
  */
 export function freeCells(state: GameState): Point[] {
-  return todo('freeCells', state)
+  const cells = Array.from(
+    { length: state.level.height },
+    (_, y) => Array.from(
+      { length: state.level.width },
+      (_, x) => ({ x, y })
+    )
+  ).flat()
+
+  const libres = cells.filter(p => isFree(state, p))
+
+  const sansCibles = libres.filter(p =>
+    !state.targets.some(target => samePoint(target, p))
+  )
+
+  return sansCibles
 }
 
 /**
@@ -74,7 +113,23 @@ export function freeCells(state: GameState): Point[] {
  * Indice : `Math.floor(random() * cells.length)` puis `{ ...state, targets: [...state.targets, cell] }`.
  */
 export function spawnTarget(state: GameState, random: () => number): GameState {
-  return todo('spawnTarget', state, random)
+  // 1. Récupérer toutes les cases libres
+  const cells = freeCells(state)
+
+  // 2. Si aucune case n'est libre, ne rien changer
+  if (cells.length === 0) {
+    return state
+  }
+
+  // 3. Choisir une case au hasard
+  const index = Math.floor(random() * cells.length)
+  const cell = cells[index]
+
+  // 4. Ajouter la cible et renvoyer le nouvel état
+  return {
+    ...state,
+    targets: [...state.targets, cell]
+  }
 }
 
 /**
@@ -90,7 +145,49 @@ export function spawnTarget(state: GameState, random: () => number): GameState {
  * Indice : `{ ...player, direction, trail, score }` construit le nouveau joueur.
  */
 export function movePlayer(state: GameState, player: Player, wanted: Direction | undefined): Player {
-  return todo('movePlayer', state, player, wanted)
+ // 1. Si le joueur est mort, on le renvoie sans changement
+  if (!player.alive) {
+    return player
+  }
+
+  // 2. Choisir la direction
+  const direction =
+    wanted !== undefined &&
+    wanted !== opposite(player.direction)
+      ? wanted
+      : player.direction
+
+  // 3. Calculer la prochaine position
+  const head = nextHead(player.trail[0], direction)
+
+  // 4. Vérifier si la case est libre
+  if (!isFree(state, head)) {
+    return {
+      ...player,
+      direction,
+      alive: false
+    }
+  }
+
+  // 5. Vérifier si le joueur récupère une cible
+  const hasTarget = state.targets.some(target =>
+    samePoint(target, head)
+  )
+
+  // 6. Calculer le nouveau score
+  const score = player.score + (hasTarget ? 1 : 0)
+
+  // 7. Calculer la nouvelle trace
+  const trail = [head, ...player.trail]
+    .slice(0, BASE_LENGTH + score)
+
+  // 8. Renvoyer le joueur mis à jour
+  return {
+    ...player,
+    direction,
+    trail,
+    score
+  }
 }
 
 /** Complète les cibles jusqu'à TARGET_COUNT (sans faire avancer personne). */
