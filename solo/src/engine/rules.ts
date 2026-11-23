@@ -17,11 +17,6 @@ import {
   type Point,
 } from './types.ts'
 
-/** Marqueur de travail à faire : lève une erreur explicite. À supprimer une fois la fonction écrite. */
-function todo(name: string, ..._args: unknown[]): never {
-  throw new Error(`TODO : ${name} n'est pas encore implémentée`)
-}
-
 /**
  * Direction opposée : on ne peut pas faire demi‑tour sur place.
  * Indice : un `switch` sur une union de littéraux est exhaustif, TypeScript vérifie
